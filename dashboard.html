@@ -91,7 +91,7 @@
 
 <header>
   <h1>MCP Crypto Tools</h1>
-  <span class="badge">12 Arac</span>
+  <span class="badge">13 Arac</span>
   <span class="badge">Turev & Duyarlilik</span>
   <div class="cache-bar">
     <span id="cacheInfo">cache: -</span>
@@ -285,6 +285,21 @@
       </div>
     </div>
 
+    <!-- 12. FDUSD Peg -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:#1e3a1e">$</div>
+        <div><div class="card-title">FDUSD Peg & Parite</div>
+        <div class="card-sub">Peg durumu, spread, hacim karsilastirmasi</div></div>
+      </div>
+      <div class="card-body">
+        <button class="run-btn" onclick="run('fdusd_peg',{},this)">
+          <span class="icon">&#9654;</span><span class="spinner"></span> Calistir</button>
+        <div class="meta-row"><div class="dot" id="f13_dot"></div><span id="f13_meta"></span><span class="duration" id="f13_dur"></span></div>
+        <div class="output-area empty" id="f13_out">Sonuc burada gorunecek</div>
+      </div>
+    </div>
+
   </div><!-- grid -->
 </main>
 
@@ -294,7 +309,7 @@ const toolMap = {
   fonlama_orani:'f1', acik_pozisyon:'f2', long_short_orani:'f3',
   basis_analiz:'f4', premium_index:'f5', likidasyon_akisi:'f6',
   korku_acgozluluk:'f7', volatilite_endeksi:'f8', btc_korelasyon:'f9',
-  balina_pozisyon:'f10', bsc_tvl:'f11', piyasa_ozeti:'f12'
+  balina_pozisyon:'f10', bsc_tvl:'f11', piyasa_ozeti:'f12', fdusd_peg:'f13'
 };
 
 async function run(tool, params, btn) {

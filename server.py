@@ -19,6 +19,7 @@ mcp.tool()(T.volatilite_endeksi)
 mcp.tool()(T.btc_korelasyon)
 mcp.tool()(T.balina_pozisyon)
 mcp.tool()(T.bsc_tvl)
+mcp.tool()(T.fdusd_peg)
 mcp.tool()(T.piyasa_ozeti)
 
 if __name__ == "__main__":

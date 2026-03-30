@@ -96,6 +96,10 @@ async def api_whale(r: Request):
 async def api_bsc(r: Request):
     return await run_tool(T.bsc_tvl)
 
+@app.post("/api/fdusd_peg")
+async def api_fdusd(r: Request):
+    return await run_tool(T.fdusd_peg)
+
 @app.post("/api/piyasa_ozeti")
 async def api_ozet(r: Request):
     d = await r.json()

@@ -777,16 +777,123 @@ async def bsc_tvl() -> str:
     return result
 
 
-# ─── 12. Piyasa Ozeti (Hepsi Bir Arada) ──────────────────────────────────────
+# ─── 12. FDUSD Peg & Parite Takibi ───────────────────────────────────────────
+async def fdusd_peg() -> str:
+    """FDUSD/USDT peg durumu, BNBFDUSD vs BNBUSDT fiyat farki ve hacim karsilastirmasi."""
+    key = "fdusd_peg"
+    if c := cache_get(key, 60): return c
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        lines = [f"**FDUSD Peg & Parite Analizi** — {datetime.now(timezone.utc).strftime('%H:%M UTC')}\n"]
+
+        # 1) FDUSD/USDT peg
+        fdusd_price = 1.0
+        try:
+            r = await client.get("https://api.binance.com/api/v3/ticker/24hr?symbol=FDUSDUSDT")
+            d = r.json()
+            fdusd_price = float(d["lastPrice"])
+            fdusd_high = float(d["highPrice"])
+            fdusd_low = float(d["lowPrice"])
+            fdusd_vol = float(d["quoteVolume"])
+            sapma = (fdusd_price - 1.0) * 100
+            aralik = (fdusd_high - fdusd_low) * 100
+
+            if abs(sapma) < 0.05:
+                peg_durum = "STABIL — Peg saglam"
+            elif abs(sapma) < 0.15:
+                peg_durum = "HAFIF SAPMA — Izle"
+            else:
+                peg_durum = "DIKKAT — Peg sapmasi buyuk, efektif maliyeti etkiler"
+
+            lines.append(
+                f"  **FDUSD/USDT Peg**\n"
+                f"    Fiyat: {fdusd_price:.4f} | Sapma: {sapma:+.3f}%\n"
+                f"    24s Aralik: {fdusd_low:.4f} — {fdusd_high:.4f} (band: {aralik:.3f}%)\n"
+                f"    24s Hacim: ${fdusd_vol/1e6:.0f}M\n"
+                f"    Durum: {peg_durum}"
+            )
+        except Exception as e:
+            lines.append(f"  FDUSD/USDT hata: {e}")
+
+        # 2) BNB fiyat karsilastirmasi: FDUSD vs USDT
+        try:
+            r1 = await client.get("https://api.binance.com/api/v3/ticker/24hr?symbol=BNBFDUSD")
+            r2 = await client.get("https://api.binance.com/api/v3/ticker/24hr?symbol=BNBUSDT")
+            d1, d2 = r1.json(), r2.json()
+
+            fdusd_px = float(d1["lastPrice"])
+            usdt_px = float(d2["lastPrice"])
+            spread = fdusd_px - usdt_px
+            spread_pct = (spread / usdt_px) * 100
+
+            # Efektif USD fiyat (FDUSD peg sapmasi dahil)
+            efektif_usd = fdusd_px * fdusd_price
+
+            # Hacim karsilastirmasi
+            vol_fdusd = float(d1["quoteVolume"])
+            vol_usdt = float(d2["quoteVolume"])
+            vol_oran = (vol_fdusd / vol_usdt) * 100 if vol_usdt else 0
+
+            lines.append(
+                f"\n  **BNB Fiyat Karsilastirmasi**\n"
+                f"    BNBFDUSD: ${fdusd_px:.2f} (islem paritesi)\n"
+                f"    BNBUSDT:  ${usdt_px:.2f} (referans)\n"
+                f"    Spread:   ${spread:+.2f} ({spread_pct:+.3f}%)\n"
+                f"    Efektif USD: ${efektif_usd:.2f} (FDUSD peg dahil)"
+            )
+
+            lines.append(
+                f"\n  **Hacim Karsilastirmasi (24 saat)**\n"
+                f"    BNBFDUSD: ${vol_fdusd/1e6:.1f}M\n"
+                f"    BNBUSDT:  ${vol_usdt/1e6:.1f}M\n"
+                f"    Oran: %{vol_oran:.1f} (FDUSD / USDT)"
+            )
+
+            # Spread yorumu
+            if spread_pct < -0.1:
+                lines.append("\n  **Yorum**: FDUSD iskontoda — alim icin avantajli, efektif maliyet dusuk")
+            elif spread_pct > 0.1:
+                lines.append("\n  **Yorum**: FDUSD primli — dikkat, efektif maliyet yuksek")
+            else:
+                lines.append("\n  **Yorum**: Pariteler dengede, normal islem kosullari")
+
+        except Exception as e:
+            lines.append(f"\n  BNB fiyat karsilastirmasi hata: {e}")
+
+    result = "\n".join(lines)
+    cache_set(key, result)
+    return result
+
+
+# ─── 13. Piyasa Ozeti (Hepsi Bir Arada) ──────────────────────────────────────
 async def piyasa_ozeti(sembol: str = "BNBUSDT") -> str:
-    """Tum metriklerin tek ekranda hizli ozeti. Dashboard icin ideal."""
+    """Tum metriklerin tek ekranda hizli ozeti. FDUSD parite bilgisi dahil."""
     key = f"ozet:{sembol}"
     if c := cache_get(key, 60): return c
 
     async with httpx.AsyncClient(timeout=20) as client:
-        lines = [f"**PIYASA OZETI** {sembol} — {datetime.now(timezone.utc).strftime('%H:%M UTC')}\n"]
+        lines = [f"**PIYASA OZETI** — {datetime.now(timezone.utc).strftime('%H:%M UTC')}\n"]
 
-        # 1) Fiyat + Premium
+        # 1) Cift fiyat: BNBFDUSD + BNBUSDT + FDUSD peg
+        try:
+            r_fdusd = await client.get("https://api.binance.com/api/v3/ticker/price?symbol=BNBFDUSD")
+            r_usdt = await client.get("https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT")
+            r_peg = await client.get("https://api.binance.com/api/v3/ticker/price?symbol=FDUSDUSDT")
+
+            px_fdusd = float(r_fdusd.json()["price"])
+            px_usdt = float(r_usdt.json()["price"])
+            peg = float(r_peg.json()["price"])
+            spread = px_fdusd - px_usdt
+            efektif = px_fdusd * peg
+
+            lines.append(
+                f"  BNBFDUSD: ${px_fdusd:.2f} | BNBUSDT: ${px_usdt:.2f} | Spread: ${spread:+.2f}\n"
+                f"  FDUSD Peg: {peg:.4f} | Efektif USD: ${efektif:.2f}"
+            )
+        except Exception:
+            lines.append("  Fiyat: veri alinamadi")
+
+        # 2) Fonlama + Premium (USDT perpetual)
         try:
             r = await client.get(f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={sembol}")
             d = r.json()
@@ -794,11 +901,11 @@ async def piyasa_ozeti(sembol: str = "BNBUSDT") -> str:
             index = float(d["indexPrice"])
             fr = float(d["lastFundingRate"])
             prem = ((mark - index) / index) * 100
-            lines.append(f"  Fiyat: ${mark:.2f} | Fonlama: {fr*100:.4f}% | Premium: {prem:+.4f}%")
+            lines.append(f"  Fonlama: {fr*100:.4f}% | Premium: {prem:+.4f}%")
         except Exception:
-            lines.append("  Fiyat: veri alinamadi")
+            pass
 
-        # 2) OI
+        # 3) OI
         try:
             r = await client.get(f"https://fapi.binance.com/fapi/v1/openInterest?symbol={sembol}")
             oi = float(r.json()["openInterest"])
@@ -806,7 +913,7 @@ async def piyasa_ozeti(sembol: str = "BNBUSDT") -> str:
         except Exception:
             pass
 
-        # 3) Taker ratio
+        # 4) Taker ratio
         try:
             r = await client.get(
                 f"https://fapi.binance.com/futures/data/takerlongshortRatio?"
@@ -818,7 +925,7 @@ async def piyasa_ozeti(sembol: str = "BNBUSDT") -> str:
         except Exception:
             pass
 
-        # 4) Top trader pozisyon
+        # 5) Top trader pozisyon
         try:
             r = await client.get(
                 f"https://fapi.binance.com/futures/data/topLongShortPositionRatio?"
@@ -831,7 +938,7 @@ async def piyasa_ozeti(sembol: str = "BNBUSDT") -> str:
         except Exception:
             pass
 
-        # 5) Basis
+        # 6) Basis
         try:
             r = await client.get(
                 f"https://fapi.binance.com/futures/data/basis?"
@@ -843,7 +950,7 @@ async def piyasa_ozeti(sembol: str = "BNBUSDT") -> str:
         except Exception:
             pass
 
-        # 6) F&G
+        # 7) F&G
         try:
             r = await client.get("https://api.alternative.me/fng/?limit=1")
             d = r.json()["data"][0]
@@ -853,8 +960,7 @@ async def piyasa_ozeti(sembol: str = "BNBUSDT") -> str:
         except Exception:
             pass
 
-        # Genel yorum
-        lines.append("\n  Detay icin: fonlama_orani, basis_analiz, long_short_orani, volatilite_endeksi")
+        lines.append("\n  Detay: fonlama_orani, basis_analiz, long_short_orani, volatilite_endeksi, fdusd_peg")
 
     result = "\n".join(lines)
     cache_set(key, result)
