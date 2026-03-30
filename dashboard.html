@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCP Crypto Tools</title>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a;
+    --border: #2d3250; --accent: #f59e0b; --accent2: #10b981;
+    --text: #e2e8f0; --muted: #8892a4; --danger: #f87171;
+    --success: #34d399; --warn: #fbbf24; --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg);
+    color: var(--text); min-height: 100vh; }
+  header { background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 14px 24px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 100; }
+  header h1 { font-size: 17px; font-weight: 600; color: var(--accent); letter-spacing: .3px; }
+  .badge { background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 20px; padding: 3px 12px; font-size: 12px; color: var(--muted); }
+  .cache-bar { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 12px; }
+  .cache-bar span { color: var(--muted); }
+  .btn-sm { background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 4px 12px; border-radius: 6px; cursor: pointer;
+    font-size: 12px; transition: .15s; }
+  .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+
+  main { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+  /* Piyasa ozeti banner */
+  .summary-banner { background: linear-gradient(135deg, #1a1d27 0%, #1e2235 100%);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px 20px; margin-bottom: 24px; }
+  .summary-banner .title { font-size: 13px; color: var(--accent); font-weight: 600; margin-bottom: 10px; }
+  .summary-banner pre { font-size: 12px; line-height: 1.7; color: var(--text);
+    white-space: pre-wrap; font-family: 'Cascadia Code', 'Fira Code', monospace; }
+  .summary-banner .meta { font-size: 11px; color: var(--muted); margin-top: 8px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 18px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
+  .card-header { padding: 14px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px; }
+  .card-icon { width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .card-title { font-size: 14px; font-weight: 600; }
+  .card-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .card-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .field input, .field select {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 8px 10px; border-radius: 7px; font-size: 13px;
+    outline: none; transition: .15s; width: 100%; }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field input::placeholder { color: var(--muted); }
+
+  .run-btn { background: var(--accent); color: #000; border: none; padding: 9px 18px;
+    border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; gap: 7px; transition: .15s; width: 100%; justify-content: center; }
+  .run-btn:hover { opacity: .9; }
+  .run-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .run-btn .spinner { width: 14px; height: 14px; border: 2px solid rgba(0,0,0,.3);
+    border-top-color: #000; border-radius: 50%; animation: spin .7s linear infinite; display: none; }
+  .run-btn.loading .spinner { display: block; }
+  .run-btn.loading .icon { display: none; }
+
+  .output-area { background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 7px; padding: 12px; font-size: 12px; line-height: 1.7;
+    color: var(--text); min-height: 80px; max-height: 350px; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-word; font-family: 'Cascadia Code', 'Fira Code', monospace; }
+  .output-area.empty { color: var(--muted); font-style: italic; font-family: inherit; }
+  .output-area.error { color: var(--danger); border-color: rgba(248,113,113,.3); }
+  .output-area.success { border-color: rgba(52,211,153,.2); }
+
+  .meta-row { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--muted); }
+  .meta-row .duration { margin-left: auto; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--success); }
+  .dot.err { background: var(--danger); }
+  .dot.loading { background: var(--warn); animation: pulse 1s infinite; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>MCP Crypto Tools</h1>
+  <span class="badge">12 Arac</span>
+  <span class="badge">Turev & Duyarlilik</span>
+  <div class="cache-bar">
+    <span id="cacheInfo">cache: -</span>
+    <button class="btn-sm" onclick="clearCache()">Temizle</button>
+    <button class="btn-sm" onclick="loadSummary()">Ozet Yenile</button>
+  </div>
+</header>
+
+<main>
+  <!-- Piyasa Ozeti Banner -->
+  <div class="summary-banner">
+    <div class="title">PIYASA OZETI — BNBUSDT</div>
+    <pre id="summaryContent">Yukleniyor...</pre>
+    <div class="meta" id="summaryMeta"></div>
+  </div>
+
+  <div class="grid">
+
+    <!-- 1. Fonlama Orani -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:#1e3a5f">%</div>
+        <div><div class="card-title">Fonlama Orani</div>
+        <div class="card-sub">Binance + Bybit + OKX karsilastirma</div></div>
+      </div>
+      <div class="card-body">
+        <div class="field"><label>Sembol</label><input id="f1_sym" value="BNBUSDT" placeholder="BNBUSDT"></div>
+        <button class="run-btn" onclick="run('fonlama_orani',{sembol:$('#f1_sym').value},this)">
+          <span class="icon">&#9654;</span><span class="spinner"></span> Calistir</button>
+        <div class="meta-row"><div class="dot" id="f1_dot"></div><span id="f1_meta"></span><span class="duration" id="f1_dur"></span></div>
+        <div class="output-area empty" id="f1_out">Sonuc burada gorunecek</div>
+      </div>
+    </div>
+
+    <!-- 2. Acik Pozisyon -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:#1e3a2f">&#x1f4ca;</div>
+        <div><div class="card-title">Acik Pozisyon (OI)</div>
+        <div class="card-sub">3 borsa OI karsilastirmasi</div></div>
+      </div>
+      <div class="card-body">
+        <div class="field"><label>Sembol</label><input id="f2_sym" value="BNBUSDT" placeholder="BNBUSDT"></div>
+        <button class="run-btn" onclick="run('acik_pozisyon',{sembol:$('#f2_sym').value},this)">
+          <span class="icon">&#9654;</span><span class="spinner"></span> Calistir</button>
+        <div class="meta-row"><div class="dot" id="f2_dot"></div><span id="f2_meta"></span><span class="duration" id="f2_dur"></span></div>
+        <div class="output-area empty" id="f2_out">Sonuc burada gorunecek</div>
+      </div>
+    </div>
+
+    <!-- 3. Long/Short Orani -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:#3a1e3a">&#x2194;</div>
+        <div><div class="card-title">Long/Short Orani</div>
+        <div class="card-sub">4 farkli metrik (global, top, pozisyon, taker)</div></div>
+      </div>
+      <div class="card-body">
+        <div class="field"><label>Sembol</label><input id="f3_sym" value="BNBUSDT" placeholder="BNBUSDT"></div>
+        <div class="field"><label>Periyot</label>
+          <select id="f3_per"><option value="5m">5m</option><option value="15m">15m</option><option value="1h">1h</option><option value="4h">4h</option></select></div>
+        <button class="run-btn" onclick="run('long_short_orani',{sembol:$('#f3_sym').value,periyot:$('#f3_per').value},this)">
+          <span class="icon">&#9654;</span><span class="spinner"></span> Calistir</button>
+        <div class="meta-row"><div class="dot" id="f3_dot"></div><span id="f3_meta"></span><span class="duration" id="f3_dur"></span></div>
+        <div class="output-area empty" id="f3_out">Sonuc burada gorunecek</div>
+      </div>
+    </div>
+
+    <!-- 4. Basis Analizi -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:#3a2e1e">&#x1f4c9;</div>
+        <div><div class="card-title">Basis Analizi</div>
+        <div class="card-sub">Vadeli-spot spread + Z-score</div></div>
+      </div>
+      <div class="card-body">
+        <div class="field"><label>Sembol</label><input id="f4_sym" value="BNBUSDT" placeholder="BNBUSDT"></div>
+        <button class="run-btn" onclick="run('basis_analiz',{sembol:$('#f4_sym').value},this)">
+          <span class="icon">&#9654;</span><span class="spinner"></span> Calistir</button>
+        <div class="meta-row"><div class="dot" id="f4_dot"></div><span id="f4_meta"></span><span class="duration" id="f4_dur"></span></div>
+        <div class="output-area empty" id="f4_out">Sonuc burada gorunecek</div>
+      </div>
+    </div>
+
+    <!-- 5. Premium Index -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:#1e2e4a">&#x1f3af;</div>
+        <div><div class="card-title">Premium Index</div>
+        <div class="card-sub">Mark vs Index + Borsa bilesenleri</div></div>
+      </div>
+      <div class="card-body">
+        <div class="field"><label>Sembol</label><input id="f5_sym" value="BNBUSDT" placeholder="BNBUSDT"></div>
+        <button class="run-btn" onclick="run('premium_index',{sembol:$('#f5_sym').value},this)">
+          <span class="icon">&#9654;</span><span class="spinner"></span> Calistir</button>
+        <div class="meta-row"><div class="dot" id="f5_dot"></div><span id="f5_meta"></span><span class="duration" id="f5_dur"></span></div>
+        <div class="output-area empty" id="f5_out">Sonuc burada gorunecek</div>
+      </div>
+    </div>
+
+    <!-- 6. Likidasyon Akisi -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:#4a1e1e">&#x1f4a5;</div>
+        <div><div class="card-title">Likidasyon Akisi</div>
+        <div class="card-sub">Bybit + OKX son likidasyonlar</div></div>
+      </div>
+      <div class="card-body">
+        <div class="field"><label>Sembol</label><input id="f6_sym" value="BNBUSDT" placeholder="BNBUSDT"></div>
+        <button class="run-btn" onclick="run('likidasyon_akisi',{sembol:$('#f6_sym').value},this)">
+          <span class="icon">&#9654;</span><span class="spinner"></span> Calistir</button>
+        <div class="meta-row"><div class="dot" id="f6_dot"></div><span id="f6_meta"></span><span class="duration" id="f6_dur"></span></div>
+        <div class="output-area empty" id="f6_out">Sonuc burada gorunecek</div>
+      </div>
+    </div>
+
+    <!-- 7. Korku & Acgozluluk -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:#3a3a1e">&#x1f628;</div>
+        <div><div class="card-title">Korku & Acgozluluk</div>
+        <div class="card-sub">Alternative.me endeksi (7 gunluk)</div></div>
+      </div>
+      <div class="card-body">
+        <button class="run-btn" onclick="run('korku_acgozluluk',{},this)">
+          <span class="icon">&#9654;</span><span class="spinner"></span> Calistir</button>
+        <div class="meta-row"><div class="dot" id="f7_dot"></div><span id="f7_meta"></span><span class="duration" id="f7_dur"></span></div>
+        <div class="output-area empty" id="f7_out">Sonuc burada gorunecek</div>
+      </div>
+    </div>
+
+    <!-- 8. Volatilite Endeksi -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:#2e1e4a">&#x1f30a;</div>
+        <div><div class="card-title">Volatilite Endeksi</div>
+        <div class="card-sub">Deribit DVOL + IV/RV + Put/Call</div></div>
+      </div>
+      <div class="card-body">
+        <button class="run-btn" onclick="run('volatilite_endeksi',{},this)">
+          <span class="icon">&#9654;</span><span class="spinner"></span> Calistir</button>
+        <div class="meta-row"><div class="dot" id="f8_dot"></div><span id="f8_meta"></span><span class="duration" id="f8_dur"></span></div>
+        <div class="output-area empty" id="f8_out">Sonuc burada gorunecek</div>
+      </div>
+    </div>
+
+    <!-- 9. BTC-BNB Korelasyon -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:#1e3a3a">&#x1f517;</div>
+        <div><div class="card-title">BTC-BNB Korelasyon</div>
+        <div class="card-sub">Korelasyon, beta, goreceli performans</div></div>
+      </div>
+      <div class="card-body">
+        <div class="field"><label>Periyot (saat)</label><input id="f9_per" value="100" type="number" placeholder="100"></div>
+        <button class="run-btn" onclick="run('btc_korelasyon',{periyot:parseInt($('#f9_per').value)},this)">
+          <span class="icon">&#9654;</span><span class="spinner"></span> Calistir</button>
+        <div class="meta-row"><div class="dot" id="f9_dot"></div><span id="f9_meta"></span><span class="duration" id="f9_dur"></span></div>
+        <div class="output-area empty" id="f9_out">Sonuc burada gorunecek</div>
+      </div>
+    </div>
+
+    <!-- 10. Balina Pozisyon -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:#1e2a3a">&#x1f40b;</div>
+        <div><div class="card-title">Balina Pozisyonlari</div>
+        <div class="card-sub">Hyperliquid on-chain veri</div></div>
+      </div>
+      <div class="card-body">
+        <div class="field"><label>Coin</label><input id="f10_coin" value="BNB" placeholder="BNB"></div>
+        <button class="run-btn" onclick="run('balina_pozisyon',{coin:$('#f10_coin').value},this)">
+          <span class="icon">&#9654;</span><span class="spinner"></span> Calistir</button>
+        <div class="meta-row"><div class="dot" id="f10_dot"></div><span id="f10_meta"></span><span class="duration" id="f10_dur"></span></div>
+        <div class="output-area empty" id="f10_out">Sonuc burada gorunecek</div>
+      </div>
+    </div>
+
+    <!-- 11. BSC TVL -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:#2a3a1e">&#x1f3e6;</div>
+        <div><div class="card-title">BSC TVL & DeFi</div>
+        <div class="card-sub">DeFiLlama BSC verileri</div></div>
+      </div>
+      <div class="card-body">
+        <button class="run-btn" onclick="run('bsc_tvl',{},this)">
+          <span class="icon">&#9654;</span><span class="spinner"></span> Calistir</button>
+        <div class="meta-row"><div class="dot" id="f11_dot"></div><span id="f11_meta"></span><span class="duration" id="f11_dur"></span></div>
+        <div class="output-area empty" id="f11_out">Sonuc burada gorunecek</div>
+      </div>
+    </div>
+
+  </div><!-- grid -->
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const toolMap = {
+  fonlama_orani:'f1', acik_pozisyon:'f2', long_short_orani:'f3',
+  basis_analiz:'f4', premium_index:'f5', likidasyon_akisi:'f6',
+  korku_acgozluluk:'f7', volatilite_endeksi:'f8', btc_korelasyon:'f9',
+  balina_pozisyon:'f10', bsc_tvl:'f11', piyasa_ozeti:'f12'
+};
+
+async function run(tool, params, btn) {
+  const id = toolMap[tool];
+  const out = $(`#${id}_out`);
+  const dot = $(`#${id}_dot`);
+  const meta = $(`#${id}_meta`);
+  const dur = $(`#${id}_dur`);
+
+  btn.classList.add('loading'); btn.disabled = true;
+  out.className = 'output-area'; out.textContent = 'Yukleniyor...';
+  if(dot) dot.className = 'dot loading';
+  const t0 = performance.now();
+
+  try {
+    const r = await fetch(`/api/${tool}`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(params)
+    });
+    const d = await r.json();
+    const elapsed = ((performance.now()-t0)/1000).toFixed(2);
+
+    if (d.ok) {
+      out.className = 'output-area success';
+      out.textContent = d.result;
+      if(dot) dot.className = 'dot ok';
+      if(meta) meta.textContent = 'basarili';
+    } else {
+      out.className = 'output-area error';
+      out.textContent = 'HATA: ' + d.error + '\n\n' + (d.trace||'');
+      if(dot) dot.className = 'dot err';
+      if(meta) meta.textContent = 'hata';
+    }
+    if(dur) dur.textContent = elapsed + 's';
+  } catch(e) {
+    out.className = 'output-area error';
+    out.textContent = 'Baglanti hatasi: ' + e.message;
+    if(dot) dot.className = 'dot err';
+  }
+  btn.classList.remove('loading'); btn.disabled = false;
+  refreshCache();
+}
+
+async function loadSummary() {
+  const el = $('#summaryContent');
+  const meta = $('#summaryMeta');
+  el.textContent = 'Yukleniyor...';
+  const t0 = performance.now();
+  try {
+    const r = await fetch('/api/piyasa_ozeti', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({sembol:'BNBUSDT'})
+    });
+    const d = await r.json();
+    const elapsed = ((performance.now()-t0)/1000).toFixed(2);
+    el.textContent = d.ok ? d.result : 'Hata: ' + d.error;
+    meta.textContent = `${elapsed}s — Son guncelleme: ${new Date().toLocaleTimeString('tr-TR')}`;
+  } catch(e) {
+    el.textContent = 'Baglanti hatasi: ' + e.message;
+  }
+}
+
+async function refreshCache() {
+  try {
+    const r = await fetch('/api/cache/stats');
+    const d = await r.json();
+    $('#cacheInfo').textContent = `cache: ${d.total} kayit`;
+  } catch(e) {}
+}
+
+async function clearCache() {
+  await fetch('/api/cache/clear', {method:'POST'});
+  refreshCache();
+}
+
+// Sayfa yuklendiginde ozet ve cache bilgisini cek
+loadSummary();
+refreshCache();
+</script>
+
+</body>
+</html>
